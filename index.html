@@ -25790,8 +25790,8 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
       "#cc-pin-gate button{width:100%;border:0;border-radius:14px;padding:13px;font-weight:900;font-size:1rem;cursor:pointer;margin-top:8px}" +
       "#cc-pin-gate .cc-ok{background:linear-gradient(135deg,#ea580c,#f59e0b);color:#fff}" +
       "#cc-pin-gate .cc-sec{background:#f1f5f9;color:#475569;font-size:.85rem}" +
-      "#cc-pin-chip{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:2147482000;background:#0f2340;color:#fff;border-radius:999px;padding:7px 13px;font:800 .75rem system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer}" +
-      "#cc-pin-chip b{letter-spacing:.15rem;color:#fbbf24}" +
+      "#cc-pin-chip{position:static!important;display:flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;width:100%;margin:4px 0 0;padding:3px 8px;border:2px solid #0f2340;border-radius:10px;background:#fbbf24;color:#0f2340;font:800 .68rem system-ui,-apple-system,sans-serif;line-height:1.1;white-space:nowrap;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)}" +
+      "#cc-pin-chip b{letter-spacing:.2rem;color:#0f2340;font-size:1.05rem;font-weight:900;padding-left:.2rem}" +
       ".cc-pin-linha{border-top:1px dashed #e5e7eb;margin-top:8px;padding-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.72rem;color:#64748b}" +
       ".cc-pin-linha b{font-size:1rem;letter-spacing:.2rem;color:#0f2340}" +
       ".cc-pin-linha button{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:3px 9px;font-weight:800;font-size:.7rem;color:#0f2340;cursor:pointer}";
@@ -25895,7 +25895,7 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
       if (!r || r.error || !r.data || !r.data.length) { msg.textContent = "Não foi possível encerrar agora. Tente de novo."; return; }
       ls(K_OK + n, null);
       if (!l.row.status || l.row.status === "livre") marcarOcupada(n);   // sair NÃO libera a mesa: só o garçom
-      var ch = document.getElementById("cc-pin-chip"); if (ch) ch.remove();
+      chipPin = null; var ch = document.getElementById("cc-pin-chip"); if (ch) ch.remove();
       g.querySelector(".cc-box").innerHTML = '<div style="font-size:2.4rem">👋</div><h2>Obrigado pela visita!</h2><p>Seu código foi desativado e o garçom vai arrumar a mesa. Volte sempre! 🌴</p><button class="cc-ok" id="cc-pin-x">Fechar</button>';
       g.querySelector("#cc-pin-x").onclick = fechaGate;
     };
@@ -25905,13 +25905,28 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
   async function chip() {
     if (!cliente()) return;
     var n = mesaAtual(), el = document.getElementById("cc-pin-chip");
-    if (!n || !emp()) { if (el) el.remove(); return; }
+    if (!n || !emp()) { chipPin = null; if (el) el.remove(); return; }
     var l = await lerMesa(n), raw = l.row && l.row.pin_sessao;
-    if (l.erro || !raw || pinOf(raw) === "SAIU" || ls(K_OK + n) !== raw) { if (el) el.remove(); return; }
+    if (l.erro || !raw || pinOf(raw) === "SAIU" || ls(K_OK + n) !== raw) { if (!l.erro) chipPin = null; if (el && !l.erro) el.remove(); return; }
     css();
-    if (!el) { el = document.createElement("div"); el.id = "cc-pin-chip"; el.onclick = function () { var m = mesaAtual(); avisoDono(m, ls(K_OK + m), "Mesa " + pad(m)); }; document.body.appendChild(el); }
-    el.innerHTML = "🔐 Mesa " + pad(n) + " · código <b>" + pinOf(raw) + "</b>";
+    chipPin = { n: n, pin: pinOf(raw) }; montarChip();
   }
+  /* O código fica colado no campo do número da mesa (cabeçalho), em linha própria sob o campo: não toca nas abas,
+     nos botões nem nos somatórios. Se a tela for redesenhada, é recolocado sozinho. */
+  var chipPin = null;
+  function montarChip() {
+    try {
+      var el = document.getElementById("cc-pin-chip");
+      if (!chipPin || !cliente()) { if (el) el.remove(); return; }
+      var host = document.getElementById("cc-slot-mesa-cliente"); if (!host) return;
+      css();
+      if (!el) { el = document.createElement("div"); el.id = "cc-pin-chip"; el.onclick = function () { var m = mesaAtual(); avisoDono(m, ls(K_OK + m), "Mesa " + pad(m)); }; }
+      var html = '🔐 Código <b>' + chipPin.pin + '</b>';
+      if (el.getAttribute("data-v") !== html) { el.innerHTML = html; el.setAttribute("data-v", html); }
+      if (el.parentNode !== host) host.appendChild(el);
+    } catch (e) {}
+  }
+  setInterval(function () { if (!document.hidden) montarChip(); }, 1500);
 
   /* Núcleo: libera a ação ou pede o código. Resolve true/false. */
   async function protegido(n) {
@@ -26603,3 +26618,31 @@ html body .cc-lbl-mesa{position:absolute;top:-5px;left:calc(1rem + 12px);z-index
   d.addEventListener('click',function(){setTimeout(function(){medir();agendarAbas()},250)},true);
 })();
 </script>
+
+<style id="cc-abas5-final">
+/* ═══ ABAS DE CATEGORIAS (cliente) — as 5 juntas na mesma linha, maiores, com FOTO e NOME inteiros ═══
+   Bloco final do arquivo: só reposiciona/dimensiona as abas. Não mexe em lógica, cardápio, PIN nem mapa. */
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav{
+  display:grid!important;grid-auto-flow:row!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;grid-auto-columns:minmax(0,1fr)!important;
+  gap:6px!important;padding:2px 8px 8px!important;width:100%!important;box-sizing:border-box!important;
+  overflow:visible!important;scroll-snap-type:none!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-card{
+  position:relative!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;
+  width:auto!important;min-width:0!important;max-width:none!important;height:auto!important;min-height:0!important;max-height:none!important;
+  aspect-ratio:1/1.3!important;margin:0!important;padding:0 2px 6px!important;box-sizing:border-box!important;
+  border-radius:16px!important;overflow:hidden!important;flex:none!important;
+  background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important}
+/* véu escuro na base da foto: o nome fica legível sobre qualquer imagem */
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-card::after{
+  content:""!important;position:absolute!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;
+  height:58%!important;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.78))!important;pointer-events:none!important;z-index:0!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-label{
+  position:relative!important;z-index:1!important;display:block!important;width:100%!important;min-height:0!important;
+  color:#fff!important;text-shadow:0 1px 4px rgba(0,0,0,.95)!important;text-align:center!important;
+  font-weight:800!important;font-size:clamp(.64rem,3.2vw,.82rem)!important;line-height:1.1!important;letter-spacing:0!important;text-transform:none!important;
+  white-space:normal!important;overflow:visible!important;text-overflow:clip!important;word-break:normal!important;overflow-wrap:normal!important;hyphens:none!important}
+/* sem rolagem lateral: as setas não são mais necessárias */
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap .sw-btn,
+html body.cc-modo-cliente #cat-nav-arrow{display:none!important}
+</style>
