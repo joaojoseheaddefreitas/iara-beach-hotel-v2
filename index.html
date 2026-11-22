@@ -25599,7 +25599,32 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
   function emp() { return window.COOKCONTROL_EMPRESA_ID_ATIVA; }
   function sb() { return ccGetSupabaseClient(); }
   function equipe() { try { return typeof window.ccDispositivoEquipe === "function" && !!window.ccDispositivoEquipe(); } catch (e) { return false; } }
-  function cliente() { try { return !equipe() && typeof ccEhAcessoCliente === "function" && ccEhAcessoCliente(); } catch (e) { return false; } }
+  /* CORREÇÃO: ccEhAcessoCliente() vive dentro de outro bloco (IIFE da capa) e NÃO é global — por isso o PIN nunca disparava.
+     Agora a detecção é própria: ?mesa=N, ?role=cliente ou papel "cliente", sempre que o aparelho NÃO for da equipe. */
+  function cliente() {
+    try {
+      if (equipe()) return false;
+      var q = new URLSearchParams(location.search);
+      if (q.get("mesa") || q.get("role") === "cliente") return true;
+      if (window.SirAccess && typeof window.SirAccess.getRole === "function" && window.SirAccess.getRole() === "cliente") return true;
+      if (typeof window.ccEhAcessoCliente === "function") return !!window.ccEhAcessoCliente();
+    } catch (e) {}
+    return false;
+  }
+  var _erroPin = null;
+  /* Alerta visível (nunca mais falha em silêncio): diz exatamente o que impediu o código de ser gravado no Supabase */
+  function alertaPin(html) {
+    try {
+      var el = document.getElementById("cc-pin-alerta");
+      if (!el) {
+        el = document.createElement("div"); el.id = "cc-pin-alerta";
+        el.style.cssText = "position:fixed;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top,0px));z-index:2147483600;background:#991b1b;color:#fff;border-radius:14px;padding:12px 14px;font:700 .8rem/1.35 system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)";
+        el.onclick = function () { el.remove(); };
+        (document.body || document.documentElement).appendChild(el);
+      }
+      el.innerHTML = "⚠️ " + html + '<div style="font-weight:500;opacity:.85;margin-top:4px">(toque para fechar)</div>';
+    } catch (e) {}
+  }
   function mesaAtual() {
     var m = null;
     try { if (typeof S !== "undefined" && S && S.mesa) m = S.mesa; } catch (e) {}
@@ -25623,7 +25648,7 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
   /* ─── Supabase ─── */
   async function lerMesa(n) {
     var r = await sb().from("mesas").select("numero,status,total,pin_sessao").eq("empresa_id", emp()).eq("numero", n).maybeSingle();
-    if (r && r.error) { if (erroColuna(r.error)) semColuna = true; return { erro: r.error }; }
+    if (r && r.error) { _erroPin = String(r.error.message || r.error.code || "erro"); if (erroColuna(r.error)) semColuna = true; return { erro: r.error }; }
     return { row: (r && r.data) || null };
   }
   /* Reivindica o código SÓ se ainda estiver como esperado (null ou o valor antigo). Sem corrida entre aparelhos. Devolve o valor gravado (raw) ou null. */
@@ -25632,10 +25657,10 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
     var q = sb().from("mesas").update({ pin_sessao: raw }).eq("empresa_id", emp()).eq("numero", n);
     q = rawAntigo ? q.eq("pin_sessao", rawAntigo) : q.is("pin_sessao", null);
     var r = await q.select("numero");
-    if (r && r.error) { if (erroColuna(r.error)) semColuna = true; return null; }
+    if (r && r.error) { _erroPin = String(r.error.message || r.error.code || "erro"); if (erroColuna(r.error)) semColuna = true; return null; }
     if (!r || !r.data || !r.data.length) {
       var ins = await sb().from("mesas").insert({ empresa_id: emp(), numero: n, status: "livre", total: 0, pin_sessao: raw });
-      if (ins && ins.error) { if (erroColuna(ins.error)) semColuna = true; return null; }
+      if (ins && ins.error) { _erroPin = String(ins.error.message || ins.error.code || "erro"); if (erroColuna(ins.error)) semColuna = true; return null; }
     }
     var c = await lerMesa(n);
     return (c.row && c.row.pin_sessao === raw) ? raw : null;
@@ -26041,7 +26066,8 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
     ocupado = true;
     try {
       var l = await lerMesa(n);
-      if (semColuna || l.erro) return;
+      if (semColuna) { alertaPin("O <b>código da mesa está DESLIGADO</b>: a coluna <b>pin_sessao</b> não existe na tabela <b>mesas</b> do Supabase. Rode o SQL de criação da coluna."); return; }
+      if (l.erro) { if (_tentAbrir >= 3) alertaPin("Não consegui ler a mesa no Supabase: " + (_erroPin || "sem resposta") + ". Confira internet / permissões (RLS)."); return; }
       var raw = l.row && l.row.pin_sessao, st = (l.row && l.row.status) || "livre";
       if (raw && ls(K_OK + n) !== raw && await mesaOciosa(l.row)) {      // mesa abandonada: este celular assume
         var pa = await reivindicar(n, raw);
@@ -26059,12 +26085,13 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
       if (st !== "livre") { ocupado = false; gate(n, "semcodigo", true); return; }
       var novo = await reivindicar(n, null);                    // mesa livre: este celular abre a mesa agora
       if (novo) { ls(K_OK + n, novo); alinharConta(n, novo); marcarOcupada(n); chip(); ocupado = false; avisoDono(n, novo); return; }
+      if (_erroPin) { alertaPin("Não consegui <b>gravar o código no Supabase</b>: " + _erroPin + ". Confira as permissões (RLS) da tabela <b>mesas</b>."); return; }
       ocupado = false; gate(n, "pin", true);                    // outro celular abriu primeiro
     } catch (e) { console.warn("[Código da mesa]", e && e.message); }
     finally { ocupado = false; }
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(aoAbrir, 1800); });
-  else setTimeout(aoAbrir, 1800);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(aoAbrir, 150); });
+  else setTimeout(aoAbrir, 150);
   /* Garante a abertura mesmo se a rede/nuvem demorar: tenta de novo (até 8x) e quando a nuvem ficar pronta */
   var _tentAbrir = 0, _tmAbrir = null;
   async function aoAbrirGarantido() {
@@ -26077,9 +26104,9 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
       var l = await lerMesa(n), raw = l.row && l.row.pin_sessao;
       if (!l.erro && raw && ls(K_OK + n) === raw) return;          // mesa aberta neste celular
     } catch (e) {}
-    if (++_tentAbrir < 8) _tmAbrir = setTimeout(aoAbrirGarantido, 3000);
+    if (++_tentAbrir < 25) _tmAbrir = setTimeout(aoAbrirGarantido, 800);
   }
-  setTimeout(aoAbrirGarantido, 4500);
+  setTimeout(aoAbrirGarantido, 600);
   window.addEventListener("cc:nuvem-pronta", function () { setTimeout(aoAbrirGarantido, 700); });
   document.addEventListener("visibilitychange", function () { if (!document.hidden && cliente()) chip(); });
   setInterval(function () { if (cliente() && !document.hidden) chip(); }, 30000);
