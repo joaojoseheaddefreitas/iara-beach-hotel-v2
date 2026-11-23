@@ -26566,7 +26566,7 @@ html body .cc-lbl-mesa{position:absolute;top:-5px;left:calc(1rem + 12px);z-index
     var fs=parseFloat(getComputedStyle(labs[0]).fontSize)||11,min=fs;
     labs.forEach(function(el){
       var f=parseFloat(getComputedStyle(el).fontSize)||fs,guard=0;
-      while(el.scrollWidth>el.clientWidth+0.5&&f>7&&guard++<30){f-=0.25;el.style.setProperty('font-size',f+'px','important')}
+      while(el.scrollWidth>el.clientWidth+0.5&&f>9.5&&guard++<30){f-=0.25;el.style.setProperty('font-size',f+'px','important')}
       if(f<min)min=f;
     });
     labs.forEach(function(el){el.style.setProperty('font-size',min+'px','important')});
@@ -26681,10 +26681,11 @@ html body .cc-lbl-mesa{left:12px!important;font-size:.58rem!important;white-spac
 html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav{
   gap:3px!important;padding:2px 3px 8px!important}
 html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-card{
+  width:100%!important;min-width:0!important;justify-self:stretch!important;align-self:start!important;
   aspect-ratio:1/1!important;border-radius:12px!important;padding:0 1px 5px!important}
 html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-card::after{height:46%!important}
 html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-label{
-  font-size:clamp(.58rem,2.75vw,.76rem)!important;font-weight:800!important}
+  font-size:clamp(.66rem,3vw,1.05rem)!important;font-weight:900!important;letter-spacing:-.01em!important}
 
 /* 4) Barra inferior do cliente livre: nenhum selo/PIN sobreposto às abas */
 html body #cc-nav-publica #cc-pin-chip{display:none!important}
