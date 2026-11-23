@@ -25918,10 +25918,10 @@ body #items-wrap .img-box img.card-img.cc-contain{object-fit:contain!important;b
     try {
       var el = document.getElementById("cc-pin-chip");
       if (!chipPin || !cliente()) { if (el) el.remove(); return; }
-      var host = document.getElementById("cc-slot-mesa-cliente"); if (!host) return;
+      var host = document.getElementById("cc-topo-banner-btn") || document.getElementById("cc-slot-mesa-cliente"); if (!host) return;
       css();
-      if (!el) { el = document.createElement("div"); el.id = "cc-pin-chip"; el.onclick = function () { var m = mesaAtual(); avisoDono(m, ls(K_OK + m), "Mesa " + pad(m)); }; }
-      var html = '🔐 Código <b>' + chipPin.pin + '</b>';
+      if (!el) { el = document.createElement("div"); el.id = "cc-pin-chip"; el.onclick = function (ev) { try { ev.stopPropagation(); } catch (e) {} var m = mesaAtual(); avisoDono(m, ls(K_OK + m), "Mesa " + pad(m)); }; }
+      var html = '<span class="cc-pin-mesa">🔐 Mesa ' + pad(chipPin.n) + '</span><span class="cc-pin-lbl">Código</span><b>' + chipPin.pin + '</b>';
       if (el.getAttribute("data-v") !== html) { el.innerHTML = html; el.setAttribute("data-v", html); }
       if (el.parentNode !== host) host.appendChild(el);
     } catch (e) {}
@@ -26594,7 +26594,7 @@ html body .cc-lbl-mesa{position:absolute;top:-5px;left:calc(1rem + 12px);z-index
   function rotuloMesa(){
     var s=$('#cc-slot-mesa-cliente');if(!s||s.querySelector('.cc-lbl-mesa'))return;
     var l=d.createElement('label');l.className='cc-lbl-mesa';l.setAttribute('for','cc-ident-input-cliente');
-    l.textContent='Nº da mesa';s.insertBefore(l,s.firstChild);
+    l.textContent='Nº da mesa ou seu nome';s.insertBefore(l,s.firstChild);
   }
   function moverSino(){
     var f=$('#cc-fab-chamar-garcom'),n=$('#cc-nav-publica');
@@ -26646,3 +26646,47 @@ html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-na
 html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap .sw-btn,
 html body.cc-modo-cliente #cat-nav-arrow{display:none!important}
 </style>
+<style id="cc-ajuste-pin-abas-20261122">
+/* ═══ AJUSTE (cliente): Mesa + PIN no banner · campo da mesa com respiro · 5 abas quadradas ═══
+   Só apresentação. Não altera lógica do PIN, cardápio, pedidos, nomes nem configurações. */
+
+/* 1) Mesa + PIN numa pílula só, no banner (abaixo das bandeiras, acima do nome) */
+html body #cc-topo-banner-btn #cc-pin-chip{
+  position:absolute!important;top:56px!important;left:50%!important;right:auto!important;bottom:auto!important;
+  transform:translateX(-50%)!important;width:auto!important;max-width:calc(100% - 24px)!important;margin:0!important;
+  padding:6px 16px!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:8px!important;
+  z-index:12!important;border:2px solid #d4a73a!important;border-radius:999px!important;background:rgba(15,35,64,.94)!important;
+  color:#fff!important;line-height:1!important;white-space:nowrap!important;box-shadow:0 4px 14px rgba(0,0,0,.45)!important;pointer-events:auto!important}
+html body #cc-topo-banner-btn #cc-pin-chip .cc-pin-mesa{font:900 .95rem system-ui,-apple-system,sans-serif!important;letter-spacing:.04em!important;text-transform:uppercase!important;color:#fff!important}
+html body #cc-topo-banner-btn #cc-pin-chip .cc-pin-mesa::after{content:" •";color:#d4a73a}
+html body #cc-topo-banner-btn #cc-pin-chip .cc-pin-lbl{font:800 .68rem system-ui,-apple-system,sans-serif!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#fff!important}
+html body #cc-topo-banner-btn #cc-pin-chip b{font-size:1.35rem!important;font-weight:900!important;letter-spacing:.16rem!important;padding-left:.1rem!important;color:#fbbf24!important;line-height:1!important}
+/* com o PIN visível, o rótulo antigo "Mesa" some (a pílula já traz a mesa) */
+html body #cc-topo-banner-btn:has(#cc-pin-chip) #label-mesa-ativa{display:none!important}
+
+/* 2) Campo "Nº da mesa ou seu nome": desce (folga do banner) e fica maior */
+body.cc-modo-cliente:not(.cc-cardapio-full){--cc-busca-sobe:-14px;--cc-bloco-sobe:0px;--cc-abas-desce:0px}
+html body.cc-modo-cliente #cc-busca-wrap #search-input,
+html body.cc-modo-cliente #cc-slot-mesa-cliente #cc-ident-input-cliente{height:52px!important;min-height:52px!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #cc-slot-mesa-cliente #cc-ident-input-cliente{
+  font-size:1.1rem!important;font-weight:800!important;color:#0f2340!important;padding-left:14px!important;padding-right:10px!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #cc-slot-mesa-cliente #cc-ident-input-cliente::placeholder{font-size:.8rem!important;font-weight:600!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #cc-busca-wrap #search-input{font-size:.8rem!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #cc-cat-nav-wrap::before{content:"";display:block;height:26px}
+
+/* rótulo fixo "Nº da mesa ou seu nome": continua visível mesmo com o campo preenchido */
+html body .cc-lbl-mesa{left:12px!important;font-size:.58rem!important;white-space:nowrap!important;z-index:7!important}
+
+/* 3) Abas do cardápio: 5 quadradas, lado a lado, bem juntas, com figura + nome inteiros */
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav{
+  gap:3px!important;padding:2px 3px 8px!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-card{
+  aspect-ratio:1/1!important;border-radius:12px!important;padding:0 1px 5px!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-card::after{height:46%!important}
+html body.cc-modo-cliente:not(.cc-cardapio-full) #conteudo-secao-mesa #cc-cat-nav-wrap #cat-nav .cat-photo-label{
+  font-size:clamp(.58rem,2.75vw,.76rem)!important;font-weight:800!important}
+
+/* 4) Barra inferior do cliente livre: nenhum selo/PIN sobreposto às abas */
+html body #cc-nav-publica #cc-pin-chip{display:none!important}
+</style>
+
